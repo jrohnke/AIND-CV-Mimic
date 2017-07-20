@@ -25,9 +25,12 @@ var validEmojis = [ 128528, 9786, 128515, 128521, 128535, 128539, 128540, 128542
 var targetEmoji, score=0, total=-1;
 var timerID=-1, counterID=-1;
 var timeout=9000, timer=timeout/1000;
-var emojiMode = 'status'
+var emojiMode = 'status';
 var audio_point, audio_background, audio_counter, audio_fail;
 var startTime, endTime;
+var columns;
+var nPlayers=1, playerLoc = new Array(nPlayers);
+var emojiTargets = new Array();
 
 // Update target emoji being displayed by supplying a unicode value
 function setTargetEmoji(code) {
@@ -67,6 +70,8 @@ function onStop() {
   audio_background.pause()
   audio_background.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAVFYAAFRWAAABAAgAZGF0YQAAAAA=';
   clearInterval(counterID);
+  clearInterval(emojiTimer);
+  clearInterval(lifeTimer);
 
   log('#logs', "Stop button pressed");
   if (detector && detector.isRunning) {
@@ -141,9 +146,13 @@ detector.addEventListener("onImageResultsSuccess", function(faces, image, timest
     log('#results', "Emoji: " + faces[0].emojis.dominantEmoji);
 
     // Call functions to draw feature points and dominant emoji (for the first face only)
-    drawFeaturePoints(canvas, image, faces[0]);
-    drawEmoji(canvas, image, faces[0], emojiMode);
-    drawCounter(canvas);
+    for (n=0; n<nPlayers; n++) {
+      getPlayerLocation(canvas, faces[n]);
+      drawFeaturePoints(canvas, image, faces[n]);
+      drawEmoji(canvas, image, faces[n], emojiMode);
+    }
+    drawGrid(canvas, image)
+    drawTargets(canvas)
 
     // TODO: Call your function to run the game (define it first!)
     gameRun(canvas, image, faces[0])
@@ -152,6 +161,25 @@ detector.addEventListener("onImageResultsSuccess", function(faces, image, timest
 
 
 // --- Custom functions ---
+
+// Get location of player on the board
+function getPlayerLocation(canvas, face, player=0){
+  var x = new Array(face.featurePoints.length);
+  var y = new Array(face.featurePoints.length);
+
+  for (var id in face.featurePoints) {
+    x[id] = face.featurePoints[id].x;
+    y[id] = face.featurePoints[id].y;
+  }
+
+  playerLoc[player].xmin = Math.min(...x);
+  playerLoc[player].xmax = Math.max(...x);
+  playerLoc[player].xcenter = (playerLoc[player].xmin + playerLoc[player].xmax) / 2;
+  playerLoc[player].ymin = Math.min(...y);
+  playerLoc[player].ymax = Math.max(...y);
+  playerLoc[player].ycenter = (playerLoc[player].ymin + playerLoc[player].ymax) / 2;
+
+}
 
 // Draw the detected facial feature points on the image
 function drawFeaturePoints(canvas, img, face) {
@@ -175,7 +203,7 @@ function drawFeaturePoints(canvas, img, face) {
 }
 
 // Draw the dominant emoji on the image
-function drawEmoji(canvas, img, face, mode='status') {
+function drawEmoji(canvas, img, face, mode='status', player=0) {
   // Obtain a 2D context object to draw on the canvas
   var ctx = canvas.getContext('2d');
   
@@ -183,22 +211,14 @@ function drawEmoji(canvas, img, face, mode='status') {
   // See: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/fillText
   // TIP: Pick a particular feature point as an anchor so that the emoji sticks to your face
 
-  var x = new Array(face.featurePoints.length);
-  var y = new Array(face.featurePoints.length);
-
-  for (var id in face.featurePoints) {
-    x[id] = face.featurePoints[id].x;
-    y[id] = face.featurePoints[id].y;
-  }
-
   if (mode == 'status') {
-    var xpos = Math.max(...x);
-    var ypos = (Math.max(...y) + Math.min(...y)) / 2;
-    var size = (xpos - Math.min(...x)) / 4;
+    var xpos = playerLoc[player].xmax
+    var ypos = playerLoc[player].ycenter
+    var size = (playerLoc[player].xmax - playerLoc[player].xmin) / 4;
   } else if (mode == 'success') {
-    var size = (Math.max(...x) - Math.min(...x));
-    var xpos = (Math.max(...x) + Math.min(...x)) / 2 - size / 2;
-    var ypos = (Math.max(...y) + Math.min(...y)) / 2;
+    var size = playerLoc[player].xmax - playerLoc[player].xmin;
+    var xpos = playerLoc[player].xcenter - size / 2;
+    var ypos = playerLoc[player].ycenter;
   }
 
   ctx.font = size+'px serif';
@@ -226,6 +246,76 @@ function drawCounter(canvas) {
 }
 
 
+// Displays the game grid, highlighting players location
+function drawGrid(canvas, image) {
+  var ctx = canvas.getContext("2d");
+
+  // draw grid
+  for (n=0; n<columns; n++) {
+    ctx.beginPath();
+    ctx.moveTo(gamegrid[n],0);
+    ctx.lineTo(gamegrid[n],height);
+    ctx.stroke();
+  }
+
+  // get players grid position
+  for (n=0; n<nPlayers; n++){
+    playerLoc[n].grid = Math.floor(playerLoc[n].xcenter / (width / columns))
+  }
+
+  // highlight the current active grid
+  for (n=0; n<nPlayers; n++){
+    ctx.fillStyle = 'rgba(225,225,225,0.25)';
+    ctx.fillRect(gamegrid[playerLoc[n].grid],0,(width / columns),height);
+  }
+}
+
+
+// Displays the target emojis
+function drawTargets(canvas){
+  var ctx = canvas.getContext('2d');
+  var targetsize = Math.floor(width/10);
+  ctx.font = targetsize+'px serif';
+  ctx.fillStyle = 'black';
+
+  if (emojiTargets.length > 0){
+    for (n=0; n<emojiTargets.length; n++){
+      targetColumn = emojiTargets[n][0];
+      targetEmoji = emojiTargets[n][1];
+      targetLife = emojiTargets[n][2];
+
+      xpos = gamegrid[targetColumn] + Math.floor(width/columns/2-targetsize/2);
+      ypos = height - (height / emojiLife * targetLife);
+      ctx.fillText(String.fromCodePoint(targetEmoji), xpos, ypos);
+    }
+  }
+}
+
+
+// keep track of emoji lifetime
+function reduceLife(erf){
+  for (n=0; n<emojiTargets.length; n++){
+    emojiTargets[n][2] -= erf;
+
+    // countdown if emoji gets close to bottom
+    if (emojiTargets[n][2] <= 2000 && emojiTargets[n][2] % 1000 == 0){
+      if (!audio_counter.paused) {
+        audio_counter.pause();
+        audio_counter.currentTime = 0;
+      }
+      audio_counter.play();
+    }
+
+    // remove emojis that reached the bottom
+    if (emojiTargets[n][2] <= 0){
+      console.log(emojiTargets[n])
+      emojiTargets.splice(n,1);
+      audio_fail.play();
+    }
+  }
+}
+
+
 // Initialise the game
 function gameInit() {
   gameGetEmoji();
@@ -245,35 +335,91 @@ function gameInit() {
   goalscore = 10;
   total = goalscore;
   setScore(score, total)
+  // number of columns the game is played in
+  columns = 3;
 
-  startTime = new Date()
-  console.log(startTime)
+  // initialise player location
+  for (n=0; n<nPlayers; n++){
+    playerLoc[n] = {xmin: 0, xmax: 0, xcenter: 0, ymin: 0, ymax: 0, ycenter: 0};
+  }
+
+  // initialise game grid
+  gamegrid = new Array(columns);
+  for (n=0; n<columns; n++) {
+    gamegrid[n] = n*Math.floor(width/columns)
+  }
+  gamegrid[columns] = width;
+
+  // game parameters
+  emojiInterval = 3000;
+  emojiLife = 5000;
+  erf = 10;
+
+  // create random emoji in random column every X seconds
+  setTimeout(function() {
+    newEmoji();
+    emojiTimer = setInterval(function() { newEmoji() }, emojiInterval);
+
+    // keep track of emoji life and position
+    lifeTimer = setInterval(function() { reduceLife(erf) }, erf);
+
+    startTime = new Date();
+  }, 2000);
 }
 
 
 // Run the game, randomly change emojis and check if the player mimics them
 function gameRun(canvas, image, face) {
-    var ctx = canvas.getContext('2d');
+  var ctx = canvas.getContext('2d');
 
-    // if timer runs out, get a new emoji
-    checkTimer();
+  // if a player mimics an emoji, remove it from the list of targets
+  for (player=0; player<nPlayers; player++){
+    hit = emojiTargets.indexOfArray( [playerLoc[player].grid, toUnicode(face.emojis.dominantEmoji)] )
 
-    // if player mimcs emoji, increase score and show new one
-    if (targetEmoji == toUnicode(face.emojis.dominantEmoji)){
+    if (hit != -1){
+      setTargetEmoji(face.emojis.dominantEmoji)
+      emojiTargets.splice(hit,1);
       score += 1;
+      setScore(score, total)
       audio_point.play();
       emojiMode = 'success';
-      setTimeout(function() {emojiMode='status'}, 1000)
+      setTimeout(function() {emojiMode='status'}, 1000);
 
       // check goal condition
       if (score == goalscore) {
         gameWin(canvas, image, face)
       }
-
-      gameGetEmoji();
     }
+  }
+
+  // // if timer runs out, get a new emoji
+  // checkTimer();
+
+  // // if player mimcs emoji, increase score and show new one
+  // if (targetEmoji == toUnicode(face.emojis.dominantEmoji)){
+  //   score += 1;
+  //   audio_point.play();
+  //   emojiMode = 'success';
+  //   setTimeout(function() {emojiMode='status'}, 1000)
+
+  //   // check goal condition
+  //   if (score == goalscore) {
+  //     gameWin(canvas, image, face)
+  //   }
+
+  //   gameGetEmoji();
 }
 
+
+// Creates a new emoji in a random columns
+function newEmoji() {
+  // get a random emoji
+  targetEmoji = validEmojis[Math.floor(Math.random() * validEmojis.length)];
+  // get a random column
+  targetColumn = Math.floor(Math.random() * columns);
+
+  emojiTargets.push([targetColumn, targetEmoji, emojiLife]);
+}
 
 // Check if timer needs to be restarted
 function checkTimer(){
@@ -283,8 +429,8 @@ function checkTimer(){
     counterID = setInterval(function () { 
       timer -= 1; 
       if (timer / (timeout/1000) <= 1/3){
-          if (audio_counter.paused) {
-            audio_counter.play();
+        if (audio_counter.paused) {
+          audio_counter.play();
         }else{
             audio_counter.currentTime = 0;
         }
@@ -313,7 +459,6 @@ function gameGetEmoji(status='success') {
 // When the game is won
 function gameWin(canvas, image, face) {
   endTime = new Date()
-  console.log(endTime)
 
   // Obtain a 2D context object to draw on the canvas
   var ctx = canvas.getContext('2d');
@@ -331,6 +476,18 @@ function gameWin(canvas, image, face) {
   // document.write('<img src="'+img+'"/>');
   onStop()
 }
+
+// Allows to search for arrays in arrays, ignoring the last element of each element in the array that is being searched in
+Array.prototype.indexOfArray = function(input)
+{
+  var inputJSON = JSON.stringify(input);
+  var mapJSON = this.map(function(obj) {
+    obj = obj.slice(0,obj.length-1);
+    obj = JSON.stringify(obj);
+    return obj;
+  });
+  return mapJSON.indexOf(inputJSON);
+};
 
 // TODO: Define any variables and functions to implement the Mimic Me! game mechanics
 
