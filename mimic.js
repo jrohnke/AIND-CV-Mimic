@@ -5,7 +5,8 @@
 
 // The affdex SDK Needs to create video and canvas elements in the DOM
 var divRoot = $("#camera")[0];  // div node where we want to add these elements
-var width = 640, height = 480;  // camera image size
+var width = $("#camera")[0].clientWidth;  // camera image size
+var height = width * 3/4;
 var faceMode = affdex.FaceDetectorMode.LARGE_FACES;  // face mode parameter
 
 // Initialize an Affectiva CameraDetector object
@@ -26,11 +27,21 @@ var targetEmoji, score=0, total=-1;
 var timerID=-1, counterID=-1;
 var timeout=9000, timer=timeout/1000;
 var emojiMode = 'status';
-var audio_point, audio_background, audio_counter, audio_fail;
 var startTime, endTime;
-var columns;
 var nPlayers=1, playerLoc = new Array(nPlayers);
 var emojiTargets = new Array();
+var setSpeed = 1, setPoints=5, setDrops = 1, setCols = 1;
+
+// sound from http://www.rpgamer.com/games/ff/ff7/ff7snd.html
+var audio_point = new Audio('point.wav');
+// sound from http://soundbible.com/
+var audio_counter = new Audio('beep.mp3')
+var audio_fail = new Audio('fail.mp3')
+audio_point.volume = 0.0;
+audio_counter.volume = 0.0;
+audio_fail.volume = 0.0;
+// music from http://www.bensound.com
+var audio_background = new Audio('bensound-funkyelement.mp3');
 
 // Update target emoji being displayed by supplying a unicode value
 function setTargetEmoji(code) {
@@ -54,6 +65,20 @@ function log(node_name, msg) {
   $(node_name).append("<span>" + msg + "</span><br />")
 }
 
+// settings
+function settingSpeed(speed){
+  setSpeed = speed;
+}
+function settingPoints(points){
+  setPoints = points;
+}
+function settingDrops(drops){
+  setDrops = drops;
+}
+function settingColumns(cols){
+  setCols = cols;
+}
+
 // --- Callback functions ---
 
 // Start button
@@ -63,6 +88,15 @@ function onStart() {
     detector.start();  // start detector
   }
   log('#logs', "Start button pressed");
+  
+  // needed to make sound work on android
+  audio_point.play()
+  audio_counter.play()
+  audio_fail.play()
+  if (audio_background.paused){
+    audio_background = new Audio('bensound-funkyelement.mp3');
+    audio_background.play()
+  }
 }
 
 // Stop button
@@ -72,26 +106,17 @@ function onStop() {
   clearInterval(counterID);
   clearInterval(emojiTimer);
   clearInterval(lifeTimer);
+  audio_point.volume = 0.0;
+  audio_counter.volume = 0.0;
+  audio_fail.volume = 0.0;
+  emojiTargets = [];
+  score = 0
 
   log('#logs', "Stop button pressed");
   if (detector && detector.isRunning) {
     detector.removeEventListener();
     detector.stop();  // stop detector
   }
-};
-
-// Reset button
-function onReset() {
-  log('#logs', "Reset button pressed");
-  if (detector && detector.isRunning) {
-    detector.reset();
-  }
-  $('#results').html("");  // clear out results
-  $("#logs").html("");  // clear out previous log
-  $("#camera").html("");  // clear out previous log
-
-  // TODO(optional): You can restart the game as well
-  // <your code here>
 };
 
 // Add a callback to notify when camera access is allowed
@@ -145,17 +170,19 @@ detector.addEventListener("onImageResultsSuccess", function(faces, image, timest
     }));
     log('#results', "Emoji: " + faces[0].emojis.dominantEmoji);
 
+    nPlayers = faces.length;
+
     // Call functions to draw feature points and dominant emoji (for the first face only)
     for (n=0; n<nPlayers; n++) {
-      getPlayerLocation(canvas, faces[n]);
+      getPlayerLocation(canvas, faces[n], n);
       drawFeaturePoints(canvas, image, faces[n]);
-      drawEmoji(canvas, image, faces[n], emojiMode);
+      drawEmoji(canvas, image, faces[n], emojiMode, n);
     }
-    drawGrid(canvas, image)
-    drawTargets(canvas)
+    drawGrid(canvas, image);
+    drawTargets(canvas);
+    drawScore(canvas);
 
-    // TODO: Call your function to run the game (define it first!)
-    gameRun(canvas, image, faces[0])
+    gameRun(canvas, image, faces);
   }
 });
 
@@ -186,16 +213,11 @@ function drawFeaturePoints(canvas, img, face) {
   // Obtain a 2D context object to draw on the canvas
   var ctx = canvas.getContext('2d');
 
-  // TODO: Set the stroke and/or fill style you want for each feature point marker
-  // See: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D#Fill_and_stroke_styles
   ctx.strokeStyle = 'lightblue';
 
   // Loop over each feature point in the face
   for (var id in face.featurePoints) {
     var featurePoint = face.featurePoints[id];
-
-    // TODO: Draw feature point, e.g. as a circle using ctx.arc()
-    // See: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/arc
     ctx.beginPath();
     ctx.arc(featurePoint.x, featurePoint.y, 2, 0, 2 * Math.PI);
     ctx.stroke();
@@ -206,10 +228,6 @@ function drawFeaturePoints(canvas, img, face) {
 function drawEmoji(canvas, img, face, mode='status', player=0) {
   // Obtain a 2D context object to draw on the canvas
   var ctx = canvas.getContext('2d');
-  
-  // TODO: Draw it using ctx.strokeText() or fillText()
-  // See: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/fillText
-  // TIP: Pick a particular feature point as an anchor so that the emoji sticks to your face
 
   if (mode == 'status') {
     var xpos = playerLoc[player].xmax
@@ -226,25 +244,14 @@ function drawEmoji(canvas, img, face, mode='status', player=0) {
   ctx.fillText(face.emojis.dominantEmoji, xpos, ypos);
 }
 
-
-// Displays the countdown timer
-function drawCounter(canvas) {
+// Displays the score
+function drawScore(canvas) {
   // Obtain a 2D context object to draw on the canvas
   var ctx = canvas.getContext('2d');
-
-  ctx.font = '48px serif'
-
-  if (timer / (timeout/1000) > 2/3){
-    ctx.fillStyle = 'green';
-  } else if (timer / (timeout/1000) > 1/3){
-    ctx.fillStyle = 'yellow';
-  } else {
-    ctx.fillStyle = 'red';
-  } 
-  
-  ctx.fillText(timer, 10, 48)
+  ctx.font = '32px serif'
+  ctx.fillStyle = 'blue';
+  ctx.fillText(score + ' / ' + total, width-96, 32);
 }
-
 
 // Displays the game grid, highlighting players location
 function drawGrid(canvas, image) {
@@ -257,19 +264,16 @@ function drawGrid(canvas, image) {
     ctx.lineTo(gamegrid[n],height);
     ctx.stroke();
   }
-
   // get players grid position
   for (n=0; n<nPlayers; n++){
     playerLoc[n].grid = Math.floor(playerLoc[n].xcenter / (width / columns))
   }
-
   // highlight the current active grid
   for (n=0; n<nPlayers; n++){
     ctx.fillStyle = 'rgba(225,225,225,0.25)';
     ctx.fillRect(gamegrid[playerLoc[n].grid],0,(width / columns),height);
   }
 }
-
 
 // Displays the target emojis
 function drawTargets(canvas){
@@ -291,7 +295,6 @@ function drawTargets(canvas){
   }
 }
 
-
 // keep track of emoji lifetime
 function reduceLife(erf){
   for (n=0; n<emojiTargets.length; n++){
@@ -305,38 +308,39 @@ function reduceLife(erf){
       }
       audio_counter.play();
     }
-
     // remove emojis that reached the bottom
     if (emojiTargets[n][2] <= 0){
-      console.log(emojiTargets[n])
       emojiTargets.splice(n,1);
+      
+      if (!audio_fail.paused) {
+        audio_fail.pause();
+        audio_fail.currentTime = 0;
+      }
       audio_fail.play();
+
+      if (score>0){
+        score --;
+        setScore(score,total)
+      }
     }
   }
 }
 
-
 // Initialise the game
 function gameInit() {
-  gameGetEmoji();
-  score = 0;
-
-  // sound from http://www.rpgamer.com/games/ff/ff7/ff7snd.html
-  audio_point = new Audio('point.wav');
-  // sound from http://soundbible.com/
-  audio_counter = new Audio('beep.mp3')
-  audio_fail = new Audio('fail.mp3')
-  // music from http://www.bensound.com
-  audio_background = new Audio('bensound-funkyelement.mp3');
-  // audio_background = new Audio('Venice_Beach.mp3');
   bgInterval = setInterval(function(){ audio_background.play() }, audio_background.duration*1000)
 
+  // Initialise game parameter with settings or defaults
   // Game mode: mimic X number of emojis and measure time
-  goalscore = 10;
+  score = 0;
+  goalscore = setPoints;
   total = goalscore;
   setScore(score, total)
-  // number of columns the game is played in
-  columns = 3;
+
+  columns = setCols;
+  emojiInterval = 3000 / setDrops;
+  emojiLife = 5000 / setSpeed;
+  erf = 10; // emoji refresh rate in [ms]
 
   // initialise player location
   for (n=0; n<nPlayers; n++){
@@ -350,12 +354,8 @@ function gameInit() {
   }
   gamegrid[columns] = width;
 
-  // game parameters
-  emojiInterval = 3000;
-  emojiLife = 5000;
-  erf = 10;
-
   // create random emoji in random column every X seconds
+  // start with a delay so everything can be displayed in time
   setTimeout(function() {
     newEmoji();
     emojiTimer = setInterval(function() { newEmoji() }, emojiInterval);
@@ -365,19 +365,22 @@ function gameInit() {
 
     startTime = new Date();
   }, 2000);
+
+  // necessary to make it work on android
+  audio_point.volume = 1.0;
+  audio_counter.volume = 1.0;
+  audio_fail.volume = 1.0;
 }
 
-
 // Run the game, randomly change emojis and check if the player mimics them
-function gameRun(canvas, image, face) {
+function gameRun(canvas, image, faces) {
   var ctx = canvas.getContext('2d');
 
   // if a player mimics an emoji, remove it from the list of targets
   for (player=0; player<nPlayers; player++){
-    hit = emojiTargets.indexOfArray( [playerLoc[player].grid, toUnicode(face.emojis.dominantEmoji)] )
+    hit = emojiTargets.indexOfArray( [playerLoc[player].grid, toUnicode(faces[player].emojis.dominantEmoji)] )
 
     if (hit != -1){
-      setTargetEmoji(face.emojis.dominantEmoji)
       emojiTargets.splice(hit,1);
       score += 1;
       setScore(score, total)
@@ -386,30 +389,12 @@ function gameRun(canvas, image, face) {
       setTimeout(function() {emojiMode='status'}, 1000);
 
       // check goal condition
-      if (score == goalscore) {
-        gameWin(canvas, image, face)
+      if (score >= goalscore) {
+        gameWin(canvas, image, faces[player])
       }
     }
   }
-
-  // // if timer runs out, get a new emoji
-  // checkTimer();
-
-  // // if player mimcs emoji, increase score and show new one
-  // if (targetEmoji == toUnicode(face.emojis.dominantEmoji)){
-  //   score += 1;
-  //   audio_point.play();
-  //   emojiMode = 'success';
-  //   setTimeout(function() {emojiMode='status'}, 1000)
-
-  //   // check goal condition
-  //   if (score == goalscore) {
-  //     gameWin(canvas, image, face)
-  //   }
-
-  //   gameGetEmoji();
 }
-
 
 // Creates a new emoji in a random columns
 function newEmoji() {
@@ -421,59 +406,21 @@ function newEmoji() {
   emojiTargets.push([targetColumn, targetEmoji, emojiLife]);
 }
 
-// Check if timer needs to be restarted
-function checkTimer(){
-  if (timerID == -1){
-    timerID = setTimeout(function() { gameGetEmoji('fail') }, timeout);
-    timer = timeout/1000;
-    counterID = setInterval(function () { 
-      timer -= 1; 
-      if (timer / (timeout/1000) <= 1/3){
-        if (audio_counter.paused) {
-          audio_counter.play();
-        }else{
-            audio_counter.currentTime = 0;
-        }
-      }
-    }, 1000);
-  }
-}
-
-// Get new emoji in case timer runs out before it has been mimiced
-function gameGetEmoji(status='success') {
-  clearTimeout(timerID);
-  clearInterval(counterID);
-  timerID = -1;
-  if (status == 'fail') { audio_fail.play() }
-
-  // total += 1;
-  setScore(score, total)
-
-  // get a random emoji
-  targetEmoji = validEmojis[Math.floor(Math.random() * validEmojis.length)];
-
-  // set it as the target for the player
-  setTargetEmoji(targetEmoji);
-}
-
 // When the game is won
 function gameWin(canvas, image, face) {
   endTime = new Date()
-
   // Obtain a 2D context object to draw on the canvas
   var ctx = canvas.getContext('2d');
 
   ctx.font = '32px serif'
   ctx.fillStyle = 'blue';
   
-  // ctx.strokeText("You mimicked " + goalscore + " in " + endTime-startTime + " seconds!", 10, 96)
   runtime = (endTime-startTime)/1000;
   ctx.fillText("You mimicked " + goalscore + " emojis in " + runtime + " seconds!", 10, 96);
   drawEmoji(canvas, image, face);
 
   var img = canvas.toDataURL("image/png");
   $("#camera").html('<img src="'+img+'"/>');
-  // document.write('<img src="'+img+'"/>');
   onStop()
 }
 
@@ -488,18 +435,3 @@ Array.prototype.indexOfArray = function(input)
   });
   return mapJSON.indexOf(inputJSON);
 };
-
-// TODO: Define any variables and functions to implement the Mimic Me! game mechanics
-
-// NOTE:
-// - Remember to call your update function from the "onImageResultsSuccess" event handler above
-// - You can use setTargetEmoji() and setScore() functions to update the respective elements
-// - You will have to pass in emojis as unicode values, e.g. setTargetEmoji(128578) for a simple smiley
-// - Unicode values for all emojis recognized by Affectiva are provided above in the list 'emojis'
-// - To check for a match, you can convert the dominant emoji to unicode using the toUnicode() function
-
-// Optional:
-// - Define an initialization/reset function, and call it from the "onInitializeSuccess" event handler above
-// - Define a game reset function (same as init?), and call it from the onReset() function above
-
-// <your code here>

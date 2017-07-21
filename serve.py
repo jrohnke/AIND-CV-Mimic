@@ -6,7 +6,8 @@ import sys
 
 port = 4443
 
-httpd = HTTPServer(('localhost', port), SimpleHTTPRequestHandler)
+httpd = HTTPServer(('', port), SimpleHTTPRequestHandler)
+
 try:
     httpd.socket = ssl.wrap_socket(httpd.socket,
         certfile=('my-ssl-cert.pem' if len(sys.argv) < 2 else sys.argv[1]),
