@@ -30,7 +30,7 @@ var emojiMode = 'status';
 var startTime, endTime;
 var nPlayers=1, playerLoc = new Array(nPlayers);
 var emojiTargets = new Array();
-var setSpeed = 1, setPoints=5, setDrops = 1, setCols = 1;
+var setSpeed = 1, setPoints=10, setDrops = 1, setCols = 3;
 
 // sound from http://www.rpgamer.com/games/ff/ff7/ff7snd.html
 var audio_point = new Audio('point.wav');
