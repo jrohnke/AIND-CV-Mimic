@@ -1,5 +1,8 @@
 # Project: Mimic Me!
 
+## Introduction
+
+This project is part of the Artificial Intelligence Nanodegree. I used the Affectiva API to create an emoji mimic game. Emojis are falling from the sky and the player needs to mimic them to score points. The Affectiva API delivers facial keypoints, likelihoods of different emotions and a dominant emoji that best represents the current facial expression. 
 
 ## Overview
 
