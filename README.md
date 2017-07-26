@@ -2,13 +2,14 @@
 
 ## Introduction
 
-This project is part of the Artificial Intelligence Nanodegree. I used the Affectiva API to create an emoji mimic game. Emojis are falling from the sky and the player needs to mimic them to score points. The Affectiva API delivers facial keypoints, likelihoods of different emotions and a dominant emoji that best represents the current facial expression. 
+This project is part of the Artificial Intelligence Nanodegree. I used the Affectiva API to create an emoji mimic game. Emojis are falling from the sky and the player needs to mimic them to score points. The Affectiva API delivers facial keypoints, likelihoods of different emotions and a dominant emoji that best represents the current facial expression.<br>
+Play it here: https://jrohnke.github.io/AIND-CV-Mimic/
 
 ## Description
 
 ### Display feature points
 
-A list of feature point position is delivered by the Affectiva API for every recognized face. Displaying these is as simple as looping through the list and plotting for example small circles at the x,y position of every feature point.
+A list of feature point positions is delivered by the Affectiva API for every recognized face. Displaying these is as simple as looping through the list and plotting for example small circles at the x,y position of every feature point.
 ![feature_points](/images/screen_keypoints.jpg)
 
 ### Dominant Emoji
@@ -18,7 +19,7 @@ The Affectiva API also provides a dominant emoji based on the evaluation of the 
 
 ### Mimic Game
 
-During gameplay, random emojis are created and have to be mimicked by the player. The emojis start at the top of the screen and fall down. If the players mimics the emoji before it reaches the bottom, he gains a point, otherwise he loses one. The game continues until a certain number of points is reached. Extra features that are difficult to highlight on the screenshot is background music as well as audio cues (countdown when and emoji gets close to reaching the bottom and when a point is scored or lost).<br>
+During gameplay, random emojis are created and have to be mimicked by the player. The emojis start at the top of the screen and fall down. If the players mimics the emoji before it reaches the bottom, he gains a point, otherwise he loses one. The game continues until a certain number of points is reached. Extra features that are difficult to highlight on the screenshot are background music as well as audio cues (countdown when an emoji gets close to reaching the bottom and when a point is scored or lost).<br>
 There is also a settings area where the number of points needed to win, the number of columns of the game grid, the speed of the falling emojis as well as the emoji spawn rate can be set.
 ![feature_points](/images/screen_targets.jpg)
 
