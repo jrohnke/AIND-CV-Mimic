@@ -4,6 +4,36 @@
 
 This project is part of the Artificial Intelligence Nanodegree. I used the Affectiva API to create an emoji mimic game. Emojis are falling from the sky and the player needs to mimic them to score points. The Affectiva API delivers facial keypoints, likelihoods of different emotions and a dominant emoji that best represents the current facial expression. 
 
+## Description
+
+### Display feature points
+
+A list of feature point position is delivered by the Affectiva API for every recognized face. Displaying these is as simple as looping through the list and plotting for example small circles at the x,y position of every feature point.
+![feature_points](/images/screen_keypoints.jpg)
+
+### Dominant Emoji
+
+The Affectiva API also provides a dominant emoji based on the evaluation of the emotions detected in the face. I defined the position of the players face by calculating the min, max and center values of the x and y coordinates of all facial keypoints. Using these, the dominant emoji can easily be placed relative to the players face. In my case this is in the center and to the right of the face for most of the game.
+![feature_points](/images/screen_emoji.jpg)
+
+### Mimic Game
+
+During gameplay, random emojis are created and have to be mimicked by the player. The emojis start at the top of the screen and fall down. If the players mimics the emoji before it reaches the bottom, he gains a point, otherwise he loses one. The game continues until a certain number of points is reached. Extra features that are difficult to highlight on the screenshot is background music as well as audio cues (countdown when and emoji gets close to reaching the bottom and when a point is scored or lost).<br>
+There is also a settings area where the number of points needed to win, the number of columns of the game grid, the speed of the falling emojis as well as the emoji spawn rate can be set.
+![feature_points](/images/screen_targets.jpg)
+
+### Game Grid
+
+The game is played on a set of columns the number of which can be chosen by the player. When new emojis spawn, they do so in a randomly selected column. The player has to be positioned correctly as well as mimic the right expression to score a point. The column the player is currently in is highlighted to make positioning easier.
+![feature_points](/images/screen_columns.jpg)
+
+### Scoring
+
+When a point is scored this is indicated by a huge face-covering emoji as well as a soundeffect (hard to highlight on the screenshot). The score display is also updated. When the game is won, a final screenshot is taken to celebrate the players huge achievement.
+![feature_points](/images/screen_score.jpg)
+![feature_points](/images/screen_win.jpg)
+
+
 ## Overview
 
 In this project, you will learn to track faces in a video and identify facial expressions using Affectiva. As a fun visualization, you will tag each face with an appropriate emoji next to it. You will then turn this into a game where the player needs to mimic a random emoji displayed by the computer!

@@ -299,6 +299,7 @@ function drawTargets(canvas){
 function reduceLife(erf){
   for (n=0; n<emojiTargets.length; n++){
     emojiTargets[n][2] -= erf;
+    console.log(emojiTargets[n][2])
 
     // countdown if emoji gets close to bottom
     if (emojiTargets[n][2] <= 2000 && emojiTargets[n][2] % 1000 == 0){
@@ -340,7 +341,7 @@ function gameInit() {
   columns = setCols;
   emojiInterval = 3000 / setDrops;
   emojiLife = 5000 / setSpeed;
-  erf = 10; // emoji refresh rate in [ms]
+  erf = 100; // emoji refresh frequency
 
   // initialise player location
   for (n=0; n<nPlayers; n++){
