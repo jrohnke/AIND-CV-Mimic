@@ -85,6 +85,7 @@ function settingColumns(cols){
 function onStart() {
   if (detector && !detector.isRunning) {
     $("#logs").html("");  // clear out previous log
+    $("#camera").html("");
     detector.start();  // start detector
   }
   log('#logs', "Start button pressed");
@@ -152,8 +153,13 @@ detector.addEventListener("onInitializeSuccess", function() {
 //   probabilities for different expressions, emotions and appearance metrics
 detector.addEventListener("onImageResultsSuccess", function(faces, image, timestamp) {
   var canvas = $('#face_video_canvas')[0];
+  var ctx = canvas.getContext('2d');
+
   if (!canvas)
     return;
+
+  // draw a mirrored image of the webcam
+  drawToCanvas(canvas, ctx, width, height);
 
   // Report how many faces were found
   $('#results').html("");
@@ -186,8 +192,15 @@ detector.addEventListener("onImageResultsSuccess", function(faces, image, timest
   }
 });
 
-
 // --- Custom functions ---
+
+// Draw a mirrored image of the webcam
+function drawToCanvas(v, context, width, height){
+  context.save();
+  context.scale(-1,1);
+  context.drawImage(v,0,0,width*-1,height);
+  context.restore();
+}
 
 // Get location of player on the board
 function getPlayerLocation(canvas, face, player=0){
@@ -199,8 +212,8 @@ function getPlayerLocation(canvas, face, player=0){
     y[id] = face.featurePoints[id].y;
   }
 
-  playerLoc[player].xmin = Math.min(...x);
-  playerLoc[player].xmax = Math.max(...x);
+  playerLoc[player].xmax = width-Math.min(...x);
+  playerLoc[player].xmin = width-Math.max(...x);
   playerLoc[player].xcenter = (playerLoc[player].xmin + playerLoc[player].xmax) / 2;
   playerLoc[player].ymin = Math.min(...y);
   playerLoc[player].ymax = Math.max(...y);
@@ -219,7 +232,7 @@ function drawFeaturePoints(canvas, img, face) {
   for (var id in face.featurePoints) {
     var featurePoint = face.featurePoints[id];
     ctx.beginPath();
-    ctx.arc(featurePoint.x, featurePoint.y, 2, 0, 2 * Math.PI);
+    ctx.arc(width-featurePoint.x, featurePoint.y, 2, 0, 2 * Math.PI);
     ctx.stroke();
   }
 }
@@ -299,7 +312,6 @@ function drawTargets(canvas){
 function reduceLife(erf){
   for (n=0; n<emojiTargets.length; n++){
     emojiTargets[n][2] -= erf;
-    console.log(emojiTargets[n][2])
 
     // countdown if emoji gets close to bottom
     if (emojiTargets[n][2] <= 2000 && emojiTargets[n][2] % 1000 == 0){
